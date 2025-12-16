@@ -1,0 +1,5 @@
+{
+  "name": "PromptVault",
+  "description": "A web application for teachers to manage, organize, and export AI prompts into educational Word documents.",
+  "requestFramePermissions": []
+}
