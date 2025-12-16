@@ -52,8 +52,8 @@ const App: React.FC = () => {
     // Cloud save
     try {
       await savePromptToSupabase(newPrompt);
-    } catch (error) {
-      alert("Pozor: Prompt se uložil jen lokálně, nahrávání do cloudu selhalo.");
+    } catch (error: any) {
+      alert("Pozor: Prompt se uložil jen lokálně, nahrávání do cloudu selhalo.\nChyba: " + error.message);
     }
   };
 

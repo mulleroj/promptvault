@@ -56,9 +56,9 @@ export const savePromptToSupabase = async (prompt: PromptData): Promise<void> =>
     content: prompt.content,
     type: prompt.type,
     model: prompt.model,
-    tags: prompt.tags,
-    image_base64: prompt.imageBase64,
-    notes: prompt.notes,
+    tags: prompt.tags || [], // Ensure array
+    image_base64: prompt.imageBase64 || null, // Explicit null
+    notes: prompt.notes || null,
     created_at: new Date(prompt.createdAt).toISOString()
   };
 
@@ -68,7 +68,7 @@ export const savePromptToSupabase = async (prompt: PromptData): Promise<void> =>
 
   if (error) {
     console.error('Error saving prompt to Supabase:', error);
-    throw error;
+    throw new Error(error.message + ' (' + error.details + ')');
   }
 };
 
