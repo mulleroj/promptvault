@@ -3,7 +3,7 @@ import { PromptForm } from './components/PromptForm';
 import { PromptCard } from './components/PromptCard';
 import { PromptDetail } from './components/PromptDetail';
 import { PromptData, PromptType } from './types';
-import { savePrompts, loadPrompts } from './services/storage';
+import { savePromptsLocal, loadPromptsLocal, fetchPromptsFromSupabase, savePromptToSupabase, deletePromptFromSupabase } from './services/storage';
 import { exportPromptsToDocx } from './services/docxGenerator';
 import { Plus, Download, Search, LayoutGrid, FileText } from 'lucide-react';
 
@@ -18,31 +18,58 @@ const App: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('All');
   const [filterModel, setFilterModel] = useState<string>('All');
 
-  // Load data on mount
+  // Load data on mount (Local + Cloud)
   useEffect(() => {
-    const loaded = loadPrompts();
-    setPrompts(loaded);
+    // 1. Load local immediately for speed
+    const local = loadPromptsLocal();
+    setPrompts(local);
+
+    // 2. Fetch from cloud and update
+    fetchPromptsFromSupabase().then(cloudPrompts => {
+      if (cloudPrompts.length > 0) {
+        // Here we could implement merging, but for simplicity, we'll let cloud win if it has data
+        // or merge them. For now, let's just use cloud prompts as source of truth if available.
+        setPrompts(cloudPrompts);
+        savePromptsLocal(cloudPrompts); // Update local cache
+      }
+    });
   }, []);
 
-  // Save data on change
+  // Save data on change (only local cache, cloud save is explicit in handlers)
   useEffect(() => {
     if (prompts.length > 0) {
-      savePrompts(prompts);
+      savePromptsLocal(prompts);
     }
   }, [prompts]);
 
-  const handleSavePrompt = (newPrompt: PromptData) => {
+  const handleSavePrompt = async (newPrompt: PromptData) => {
+    // Optimistic update
     const updated = [newPrompt, ...prompts];
     setPrompts(updated);
-    savePrompts(updated); // Force save immediately
+    savePromptsLocal(updated);
     setShowAddForm(false);
+
+    // Cloud save
+    try {
+      await savePromptToSupabase(newPrompt);
+    } catch (error) {
+      alert("Pozor: Prompt se uložil jen lokálně, nahrávání do cloudu selhalo.");
+    }
   };
 
-  const handleDeletePrompt = (id: string) => {
+  const handleDeletePrompt = async (id: string) => {
     if (window.confirm('Opravdu chcete smazat tento prompt?')) {
+      // Optimistic update
       const updated = prompts.filter(p => p.id !== id);
       setPrompts(updated);
-      savePrompts(updated); // Force save
+      savePromptsLocal(updated);
+
+      // Cloud delete
+      try {
+        await deletePromptFromSupabase(id);
+      } catch (error) {
+        console.error("Cloud delete failed", error);
+      }
 
       // Remove from selection if selected
       if (selectedIds.has(id)) {

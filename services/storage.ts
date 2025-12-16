@@ -1,22 +1,85 @@
 import { PromptData } from '../types';
+import { supabase } from './supabaseClient';
 
 const STORAGE_KEY = 'promptvault_db';
 
-export const savePrompts = (prompts: PromptData[]): void => {
+// --- Local Storage Helpers ---
+
+export const savePromptsLocal = (prompts: PromptData[]): void => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
   } catch (error) {
-    console.error("Failed to save prompts to local storage", error);
-    alert("Chyba: Data se nepodařilo uložit. Pravděpodobně je obrázek příliš velký pro prohlížeč.");
+    console.warn("Failed to save to local storage (quota might be full)", error);
   }
 };
 
-export const loadPrompts = (): PromptData[] => {
+export const loadPromptsLocal = (): PromptData[] => {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     return data ? JSON.parse(data) : [];
   } catch (error) {
-    console.error("Failed to load prompts", error);
     return [];
+  }
+};
+
+// --- Supabase Helpers ---
+
+export const fetchPromptsFromSupabase = async (): Promise<PromptData[]> => {
+  const { data, error } = await supabase
+    .from('prompts')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching prompts:', error);
+    return [];
+  }
+
+  // Convert snake_case from DB to camelCase for App
+  return data.map((item: any) => ({
+    id: item.id,
+    title: item.title,
+    content: item.content,
+    type: item.type,
+    model: item.model,
+    tags: item.tags || [],
+    imageBase64: item.image_base64,
+    notes: item.notes || '',
+    createdAt: new Date(item.created_at).getTime()
+  }));
+};
+
+export const savePromptToSupabase = async (prompt: PromptData): Promise<void> => {
+  const dbItem = {
+    id: prompt.id,
+    title: prompt.title,
+    content: prompt.content,
+    type: prompt.type,
+    model: prompt.model,
+    tags: prompt.tags,
+    image_base64: prompt.imageBase64,
+    notes: prompt.notes,
+    created_at: new Date(prompt.createdAt).toISOString()
+  };
+
+  const { error } = await supabase
+    .from('prompts')
+    .upsert(dbItem, { onConflict: 'id' });
+
+  if (error) {
+    console.error('Error saving prompt to Supabase:', error);
+    throw error;
+  }
+};
+
+export const deletePromptFromSupabase = async (id: string): Promise<void> => {
+  const { error } = await supabase
+    .from('prompts')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting prompt from Supabase:', error);
+    throw error;
   }
 };
