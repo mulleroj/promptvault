@@ -5,7 +5,7 @@ import { PromptDetail } from './components/PromptDetail';
 import { PromptData, PromptType } from './types';
 import { savePromptsLocal, loadPromptsLocal, fetchPromptsFromSupabase, savePromptToSupabase, deletePromptFromSupabase } from './services/storage';
 import { exportPromptsToDocx } from './services/docxGenerator';
-import { Plus, Download, Search, LayoutGrid, FileText } from 'lucide-react';
+import { Plus, Download, Search, LayoutGrid, FileText, Upload } from 'lucide-react';
 
 const App: React.FC = () => {
   const [prompts, setPrompts] = useState<PromptData[]>([]);
@@ -103,6 +103,50 @@ const App: React.FC = () => {
     setSelectedIds(new Set()); // Clear selection after export
   };
 
+  const handleMigrateLocalData = async () => {
+    const localPrompts = loadPromptsLocal();
+    if (localPrompts.length === 0) {
+      alert('Žádná lokální data k migraci.');
+      return;
+    }
+
+    // Get current Supabase data to avoid duplicates
+    const supabasePrompts = await fetchPromptsFromSupabase();
+    const supabaseIds = new Set(supabasePrompts.map(p => p.id));
+
+    // Find prompts that are only in local storage
+    const promptsToMigrate = localPrompts.filter(p => !supabaseIds.has(p.id));
+
+    if (promptsToMigrate.length === 0) {
+      alert('Všechny lokální prompty jsou již v databázi.');
+      return;
+    }
+
+    if (!window.confirm(`Přenést ${promptsToMigrate.length} promptů z lokálního úložiště do Supabase?`)) {
+      return;
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const prompt of promptsToMigrate) {
+      try {
+        await savePromptToSupabase(prompt);
+        successCount++;
+      } catch (error) {
+        console.error('Chyba při migraci promptu:', prompt.title, error);
+        errorCount++;
+      }
+    }
+
+    alert(`Migrace dokončena!\nÚspěšně: ${successCount}\nChyby: ${errorCount}`);
+
+    // Reload data from Supabase
+    const updatedPrompts = await fetchPromptsFromSupabase();
+    setPrompts(updatedPrompts);
+    savePromptsLocal(updatedPrompts);
+  };
+
   // Derived state for filtering
   const uniqueModels = useMemo(() => {
     const models = new Set(prompts.map(p => p.model));
@@ -186,6 +230,20 @@ const App: React.FC = () => {
                   </select>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
+              <h3 className="text-sm font-semibold mb-2">Migrace dat</h3>
+              <p className="text-xs text-slate-400 mb-3">
+                Přeneste lokálně uložené prompty do cloudu (Supabase).
+              </p>
+              <button
+                onClick={handleMigrateLocalData}
+                className="w-full py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-emerald-700 hover:bg-emerald-600 text-white"
+              >
+                <Upload size={16} />
+                Migrovat lokální data
+              </button>
             </div>
 
             <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
