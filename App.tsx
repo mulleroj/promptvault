@@ -24,14 +24,11 @@ const App: React.FC = () => {
     const local = loadPromptsLocal();
     setPrompts(local);
 
-    // 2. Fetch from cloud and update
+    // 2. Fetch from cloud and update (cloud is source of truth)
     fetchPromptsFromSupabase().then(cloudPrompts => {
-      if (cloudPrompts.length > 0) {
-        // Here we could implement merging, but for simplicity, we'll let cloud win if it has data
-        // or merge them. For now, let's just use cloud prompts as source of truth if available.
-        setPrompts(cloudPrompts);
-        savePromptsLocal(cloudPrompts); // Update local cache
-      }
+      // Always update with cloud data (even if empty) - cloud is source of truth
+      setPrompts(cloudPrompts);
+      savePromptsLocal(cloudPrompts); // Update local cache
     });
   }, []);
 
