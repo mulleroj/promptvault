@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PromptData, PromptType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { Upload, X, Save, FileText, Loader2 } from 'lucide-react';
@@ -7,19 +7,33 @@ import { importFileContent } from '../services/documentImporter';
 interface PromptFormProps {
   onSave: (prompt: PromptData) => void;
   onCancel: () => void;
+  initialPrompt?: PromptData | null; // For editing
 }
 
-export const PromptForm: React.FC<PromptFormProps> = ({ onSave, onCancel }) => {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [type, setType] = useState<PromptType>(PromptType.TEXT);
-  const [model, setModel] = useState('');
-  const [tags, setTags] = useState('');
-  const [notes, setNotes] = useState('');
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
+export const PromptForm: React.FC<PromptFormProps> = ({ onSave, onCancel, initialPrompt }) => {
+  const [title, setTitle] = useState(initialPrompt?.title || '');
+  const [content, setContent] = useState(initialPrompt?.content || '');
+  const [type, setType] = useState<PromptType>(initialPrompt?.type || PromptType.TEXT);
+  const [model, setModel] = useState(initialPrompt?.model || '');
+  const [tags, setTags] = useState(initialPrompt ? initialPrompt.tags.join(', ') : '');
+  const [notes, setNotes] = useState(initialPrompt?.notes || '');
+  const [imageBase64, setImageBase64] = useState<string | null>(initialPrompt?.imageBase64 || null);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
+
+  // Update form when initialPrompt changes
+  useEffect(() => {
+    if (initialPrompt) {
+      setTitle(initialPrompt.title);
+      setContent(initialPrompt.content);
+      setType(initialPrompt.type);
+      setModel(initialPrompt.model);
+      setTags(initialPrompt.tags.join(', '));
+      setNotes(initialPrompt.notes || '');
+      setImageBase64(initialPrompt.imageBase64);
+    }
+  }, [initialPrompt]);
 
   const handleDocImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -68,7 +82,7 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSave, onCancel }) => {
     }
 
     const newPrompt: PromptData = {
-      id: uuidv4(),
+      id: initialPrompt?.id || uuidv4(), // Keep existing ID if editing
       title,
       content,
       type,
@@ -76,7 +90,8 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSave, onCancel }) => {
       tags: tags.split(',').map(t => t.trim()).filter(t => t),
       imageBase64,
       notes,
-      createdAt: Date.now(),
+      createdAt: initialPrompt?.createdAt || Date.now(), // Keep original createdAt if editing
+      isFavorite: initialPrompt?.isFavorite || false, // Preserve favorite status
     };
 
     onSave(newPrompt);
@@ -85,7 +100,9 @@ export const PromptForm: React.FC<PromptFormProps> = ({ onSave, onCancel }) => {
   return (
     <div className="bg-white rounded-lg shadow-xl border border-slate-200 max-h-[85vh] flex flex-col">
       <div className="flex justify-between items-center p-6 border-b border-slate-200 flex-shrink-0">
-        <h2 className="text-2xl font-bold text-slate-800">Přidat nový prompt</h2>
+        <h2 className="text-2xl font-bold text-slate-800">
+          {initialPrompt ? 'Upravit prompt' : 'Přidat nový prompt'}
+        </h2>
         <button onClick={onCancel} className="text-slate-400 hover:text-slate-600">
           <X size={24} />
         </button>

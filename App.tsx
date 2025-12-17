@@ -10,6 +10,7 @@ import { Plus, Download, Search, LayoutGrid, FileText, Upload, Star, Copy } from
 const App: React.FC = () => {
   const [prompts, setPrompts] = useState<PromptData[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState<PromptData | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [viewedPromptId, setViewedPromptId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string>('');
@@ -37,14 +38,35 @@ const App: React.FC = () => {
 
   const handleSavePrompt = async (newPrompt: PromptData) => {
     setShowAddForm(false);
+    setEditingPrompt(null);
 
     // Save to Supabase
     try {
       await savePromptToSupabase(newPrompt);
-      // On success, add to local state using functional update
-      setPrompts(prevPrompts => [newPrompt, ...prevPrompts]);
+
+      // Check if we're editing or creating new
+      const existingIndex = prompts.findIndex(p => p.id === newPrompt.id);
+      if (existingIndex >= 0) {
+        // Update existing prompt
+        setPrompts(prevPrompts =>
+          prevPrompts.map(p => p.id === newPrompt.id ? newPrompt : p)
+        );
+        showToast('✏️ Prompt upraven');
+      } else {
+        // Add new prompt
+        setPrompts(prevPrompts => [newPrompt, ...prevPrompts]);
+        showToast('✅ Prompt přidán');
+      }
     } catch (error: any) {
       alert("Chyba při ukládání do databáze: " + error.message);
+    }
+  };
+
+  const handleEditPrompt = (id: string) => {
+    const prompt = prompts.find(p => p.id === id);
+    if (prompt) {
+      setEditingPrompt(prompt);
+      setViewedPromptId(null); // Close detail view if open
     }
   };
 
@@ -429,6 +451,19 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {/* Modal Overlay for Edit Form */}
+        {editingPrompt && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="w-full max-w-2xl animate-in fade-in zoom-in duration-200">
+              <PromptForm
+                initialPrompt={editingPrompt}
+                onSave={handleSavePrompt}
+                onCancel={() => setEditingPrompt(null)}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Modal Overlay for Viewing Prompt Detail */}
         {viewedPromptId && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -477,6 +512,7 @@ const App: React.FC = () => {
                   onView={handleViewPrompt}
                   onToggleFavorite={handleToggleFavorite}
                   onCopy={handleCopyToClipboard}
+                  onEdit={handleEditPrompt}
                 />
               ))}
             </div>

@@ -10,9 +10,10 @@ interface PromptCardProps {
   onView: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onCopy: (content: string) => void;
+  onEdit: (id: string) => void;
 }
 
-export const PromptCard: React.FC<PromptCardProps> = ({ prompt, isSelected, onToggleSelect, onDelete, onView, onToggleFavorite, onCopy }) => {
+export const PromptCard: React.FC<PromptCardProps> = ({ prompt, isSelected, onToggleSelect, onDelete, onView, onToggleFavorite, onCopy, onEdit }) => {
   return (
     <div
       className={`prompt-card relative border rounded-lg overflow-hidden transition-all duration-200 hover:shadow-md cursor-pointer
@@ -87,6 +88,12 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, isSelected, onTo
             >
               <Copy size={12} />
               Kopírovat
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(prompt.id); }}
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+            >
+              Upravit
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onView(prompt.id); }}
