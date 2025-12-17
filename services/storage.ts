@@ -45,7 +45,8 @@ export const fetchPromptsFromSupabase = async (): Promise<PromptData[]> => {
     tags: item.tags || [],
     imageBase64: item.image_base64,
     notes: item.notes || '',
-    createdAt: new Date(item.created_at).getTime() // Parse ISO string to timestamp
+    createdAt: new Date(item.created_at).getTime(), // Parse ISO string to timestamp
+    isFavorite: item.is_favorite || false
   }));
 };
 
@@ -65,7 +66,8 @@ export const savePromptToSupabase = async (prompt: PromptData): Promise<void> =>
     tags: prompt.tags || [], // Ensure array
     image_base64: prompt.imageBase64 || null, // Explicit null
     notes: prompt.notes || null,
-    created_at: createdAtDate.toISOString() // ISO string for timestamptz
+    created_at: createdAtDate.toISOString(), // ISO string for timestamptz
+    is_favorite: prompt.isFavorite || false
   };
 
   const { error } = await supabase
@@ -90,3 +92,36 @@ export const deletePromptFromSupabase = async (id: string): Promise<void> => {
     throw error;
   }
 };
+
+
+export const toggleFavoriteInSupabase = async (id: string, isFavorite: boolean): Promise<void> => {
+  const { error } = await supabase
+    .from('prompts')
+    .update({ is_favorite: isFavorite })
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error toggling favorite:', error);
+    throw error;
+  }
+};
+
+
+export const exportAllPrompts = (prompts: PromptData[]): string => {
+  return JSON.stringify(prompts, null, 2);
+};
+
+
+export const importPromptsData = (jsonData: string): PromptData[] => {
+  try {
+    const parsed = JSON.parse(jsonData);
+    if (Array.isArray(parsed)) {
+      return parsed as PromptData[];
+    }
+    throw new Error('Invalid format: expected array');
+  } catch (error) {
+    console.error('Error parsing import data:', error);
+    throw new Error('Neplatný formát JSON souboru');
+  }
+};
+

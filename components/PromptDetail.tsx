@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { PromptData } from '../types';
-import { X, Copy, Check, Calendar, Tag, Bot } from 'lucide-react';
+import { X, Copy, Check, Calendar, Tag, Bot, FileStack } from 'lucide-react';
 
 interface PromptDetailProps {
     prompt: PromptData;
     onClose: () => void;
+    onClone: (prompt: PromptData) => void;
 }
 
-export const PromptDetail: React.FC<PromptDetailProps> = ({ prompt, onClose }) => {
+export const PromptDetail: React.FC<PromptDetailProps> = ({ prompt, onClose, onClone }) => {
     const [copied, setCopied] = useState(false);
 
     const handleCopyPrompt = () => {
@@ -121,7 +122,14 @@ export const PromptDetail: React.FC<PromptDetailProps> = ({ prompt, onClose }) =
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-200 flex justify-end flex-shrink-0">
+            <div className="p-4 border-t border-slate-200 flex justify-between items-center flex-shrink-0">
+                <button
+                    onClick={() => { onClone(prompt); onClose(); }}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                >
+                    <FileStack size={16} />
+                    Klonovat prompt
+                </button>
                 <button
                     onClick={onClose}
                     className="px-6 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 transition-colors"

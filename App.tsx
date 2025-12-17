@@ -3,15 +3,17 @@ import { PromptForm } from './components/PromptForm';
 import { PromptCard } from './components/PromptCard';
 import { PromptDetail } from './components/PromptDetail';
 import { PromptData, PromptType } from './types';
-import { savePromptsLocal, loadPromptsLocal, fetchPromptsFromSupabase, savePromptToSupabase, deletePromptFromSupabase } from './services/storage';
+import { savePromptsLocal, loadPromptsLocal, fetchPromptsFromSupabase, savePromptToSupabase, deletePromptFromSupabase, toggleFavoriteInSupabase, exportAllPrompts, importPromptsData } from './services/storage';
 import { exportPromptsToDocx } from './services/docxGenerator';
-import { Plus, Download, Search, LayoutGrid, FileText, Upload } from 'lucide-react';
+import { Plus, Download, Search, LayoutGrid, FileText, Upload, Star, Copy } from 'lucide-react';
 
 const App: React.FC = () => {
   const [prompts, setPrompts] = useState<PromptData[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [viewedPromptId, setViewedPromptId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   // Filtering state
   const [search, setSearch] = useState('');
@@ -134,6 +136,114 @@ const App: React.FC = () => {
     setSelectedIds(new Set()); // Clear selection after export
   };
 
+  const handleToggleFavorite = async (id: string) => {
+    const prompt = prompts.find(p => p.id === id);
+    if (!prompt) return;
+
+    const newFavoriteState = !prompt.isFavorite;
+
+    try {
+      await toggleFavoriteInSupabase(id, newFavoriteState);
+      setPrompts(prevPrompts =>
+        prevPrompts.map(p => p.id === id ? { ...p, isFavorite: newFavoriteState } : p)
+      );
+      showToast(newFavoriteState ? '⭐ Přidáno do oblíbených' : 'Odebráno z oblíbených');
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      alert('Nepodařilo se změnit stav oblíbených');
+    }
+  };
+
+  const handleCopyToClipboard = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      showToast('📋 Zkopírováno do schránky!');
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      alert('Nepodařilo se zkopírovat do schránky');
+    }
+  };
+
+  const handleClonePrompt = (prompt: PromptData) => {
+    const cloned: PromptData = {
+      ...prompt,
+      id: crypto.randomUUID(),
+      title: `${prompt.title} (Kopie)`,
+      createdAt: Date.now(),
+      isFavorite: false
+    };
+    handleSavePrompt(cloned);
+    showToast('🔄 Prompt naklonován');
+  };
+
+  const handleExportJSON = () => {
+    const jsonData = exportAllPrompts(prompts);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const date = new Date().toISOString().split('T')[0];
+    a.download = `prompts_backup_${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('📥 Export dokončen!');
+  };
+
+  const handleImportJSON = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = async (e: Event) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const importedPrompts = importPromptsData(text);
+
+        // Ask user what to do with duplicates
+        const existingIds = new Set(prompts.map(p => p.id));
+        const newPrompts = importedPrompts.filter(p => !existingIds.has(p.id));
+
+        if (newPrompts.length === 0) {
+          alert('Všechny prompty z importu již existují v databázi.');
+          return;
+        }
+
+        if (!window.confirm(`Importovat ${newPrompts.length} nových promptů?`)) {
+          return;
+        }
+
+        // Save all new prompts to Supabase
+        let successCount = 0;
+        for (const prompt of newPrompts) {
+          try {
+            await savePromptToSupabase(prompt);
+            successCount++;
+          } catch (error) {
+            console.error('Error importing prompt:', error);
+          }
+        }
+
+        // Reload from Supabase
+        const updated = await fetchPromptsFromSupabase();
+        setPrompts(updated);
+        savePromptsLocal(updated);
+        showToast(`📥 Importováno ${successCount} promptů!`);
+      } catch (error: any) {
+        alert('Chyba při importu: ' + error.message);
+      }
+    };
+    input.click();
+  };
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(''), 3000);
+  };
+
 
   // Derived state for filtering
   const uniqueModels = useMemo(() => {
@@ -142,14 +252,22 @@ const App: React.FC = () => {
   }, [prompts]);
 
   const filteredPrompts = useMemo(() => {
-    return prompts.filter(p => {
-      const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase()) ||
-        p.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
-      const matchesType = filterType === 'All' || p.type === filterType;
-      const matchesModel = filterModel === 'All' || p.model === filterModel;
-      return matchesSearch && matchesType && matchesModel;
-    });
-  }, [prompts, search, filterType, filterModel]);
+    return prompts
+      .filter(p => {
+        const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase()) ||
+          p.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
+        const matchesType = filterType === 'All' || p.type === filterType;
+        const matchesModel = filterModel === 'All' || p.model === filterModel;
+        const matchesFavorites = !showFavoritesOnly || p.isFavorite;
+        return matchesSearch && matchesType && matchesModel && matchesFavorites;
+      })
+      .sort((a, b) => {
+        // Favorites first
+        if (a.isFavorite && !b.isFavorite) return -1;
+        if (!a.isFavorite && b.isFavorite) return 1;
+        return 0;
+      });
+  }, [prompts, search, filterType, filterModel, showFavoritesOnly]);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
@@ -193,6 +311,7 @@ const App: React.FC = () => {
                 <div>
                   <label className="text-xs text-slate-500 mb-1 block">Kategorie</label>
                   <select
+                    title="Filtrovat podle kategorie"
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-200"
@@ -207,6 +326,7 @@ const App: React.FC = () => {
                 <div>
                   <label className="text-xs text-slate-500 mb-1 block">Model</label>
                   <select
+                    title="Filtrovat podle modelu"
                     value={filterModel}
                     onChange={(e) => setFilterModel(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-indigo-500 text-slate-200"
@@ -217,6 +337,40 @@ const App: React.FC = () => {
                     ))}
                   </select>
                 </div>
+
+                <button
+                  onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                  className={`w-full py-2 px-3 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors border ${showFavoritesOnly
+                    ? 'bg-amber-600 border-amber-500 text-white'
+                    : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                    }`}
+                >
+                  <Star size={16} className={showFavoritesOnly ? 'fill-current' : ''} />
+                  {showFavoritesOnly ? 'Zobrazit vše' : 'Jen oblíbené'}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
+              <h3 className="text-sm font-semibold mb-2">Export / Import</h3>
+              <p className="text-xs text-slate-400 mb-3">
+                Záloha a obnova promptů ve formátu JSON
+              </p>
+              <div className="space-y-2">
+                <button
+                  onClick={handleExportJSON}
+                  className="w-full py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-indigo-700 hover:bg-indigo-600 text-white"
+                >
+                  <Download size={16} />
+                  Export JSON
+                </button>
+                <button
+                  onClick={handleImportJSON}
+                  className="w-full py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-slate-700 hover:bg-slate-600 text-white"
+                >
+                  <Upload size={16} />
+                  Import JSON
+                </button>
               </div>
             </div>
 
@@ -282,6 +436,7 @@ const App: React.FC = () => {
               <PromptDetail
                 prompt={prompts.find(p => p.id === viewedPromptId)!}
                 onClose={() => setViewedPromptId(null)}
+                onClone={handleClonePrompt}
               />
             </div>
           </div>
@@ -320,11 +475,22 @@ const App: React.FC = () => {
                   onToggleSelect={toggleSelection}
                   onDelete={handleDeletePrompt}
                   onView={handleViewPrompt}
+                  onToggleFavorite={handleToggleFavorite}
+                  onCopy={handleCopyToClipboard}
                 />
               ))}
             </div>
           )}
         </div>
+
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed bottom-8 right-8 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="bg-slate-900 text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-2">
+              <span>{toastMessage}</span>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

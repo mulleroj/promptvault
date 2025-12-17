@@ -1,6 +1,6 @@
 import React from 'react';
 import { PromptData } from '../types';
-import { Image as ImageIcon, FileText, CheckCircle } from 'lucide-react';
+import { Image as ImageIcon, FileText, CheckCircle, Star, Copy } from 'lucide-react';
 
 interface PromptCardProps {
   prompt: PromptData;
@@ -8,9 +8,11 @@ interface PromptCardProps {
   onToggleSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onView: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
+  onCopy: (content: string) => void;
 }
 
-export const PromptCard: React.FC<PromptCardProps> = ({ prompt, isSelected, onToggleSelect, onDelete, onView }) => {
+export const PromptCard: React.FC<PromptCardProps> = ({ prompt, isSelected, onToggleSelect, onDelete, onView, onToggleFavorite, onCopy }) => {
   return (
     <div
       className={`prompt-card relative border rounded-lg overflow-hidden transition-all duration-200 hover:shadow-md cursor-pointer
@@ -41,10 +43,22 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, isSelected, onTo
       {/* Content Area */}
       <div className="p-4">
         <div className="flex justify-between items-start mb-2">
-          <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
-            {prompt.type}
-          </span>
-          <span className="text-xs text-slate-500 font-medium">{prompt.model}</span>
+          <div className="flex items-center gap-2">
+            <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
+              {prompt.type}
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleFavorite(prompt.id); }}
+              className="transition-colors"
+              title={prompt.isFavorite ? 'Odstranit z oblíbených' : 'Přidat do oblíbených'}
+            >
+              <Star
+                size={16}
+                className={prompt.isFavorite ? 'fill-amber-400 text-amber-400' : 'text-slate-300 hover:text-amber-400'}
+              />
+            </button>
+          </div>
+          <span className="text-xs text-slate-500font-medium">{prompt.model}</span>
         </div>
 
         <h3 className="font-bold text-slate-800 mb-1 truncate" title={prompt.title}>{prompt.title}</h3>
@@ -66,6 +80,14 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, isSelected, onTo
 
         <div className="flex justify-between items-center pt-2 border-t border-slate-100 mt-2">
           <div className="flex gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); onCopy(prompt.content); }}
+              className="text-xs text-slate-600 hover:text-indigo-600 font-medium px-2 py-1 rounded hover:bg-indigo-50 transition-colors flex items-center gap-1"
+              title="Zkopírovat prompt"
+            >
+              <Copy size={12} />
+              Kopírovat
+            </button>
             <button
               onClick={(e) => { e.stopPropagation(); onView(prompt.id); }}
               className="text-xs text-indigo-600 hover:text-indigo-700 font-medium px-2 py-1 rounded hover:bg-indigo-50 transition-colors"

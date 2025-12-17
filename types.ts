@@ -16,6 +16,7 @@ export interface PromptData {
   imageBase64: string | null;
   notes: string;
   createdAt: number;
+  isFavorite?: boolean;
 }
 
 export interface PromptFilter {
