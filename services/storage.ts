@@ -45,11 +45,17 @@ export const fetchPromptsFromSupabase = async (): Promise<PromptData[]> => {
     tags: item.tags || [],
     imageBase64: item.image_base64,
     notes: item.notes || '',
-    createdAt: new Date(item.created_at).getTime()
+    createdAt: new Date(item.created_at).getTime() // Parse ISO string to timestamp
   }));
 };
 
+
 export const savePromptToSupabase = async (prompt: PromptData): Promise<void> => {
+  // Convert timestamp to ISO string for timestamptz column
+  const createdAtDate = typeof prompt.createdAt === 'number'
+    ? new Date(prompt.createdAt)
+    : new Date(prompt.createdAt);
+
   const dbItem = {
     id: prompt.id,
     title: prompt.title,
@@ -59,7 +65,7 @@ export const savePromptToSupabase = async (prompt: PromptData): Promise<void> =>
     tags: prompt.tags || [], // Ensure array
     image_base64: prompt.imageBase64 || null, // Explicit null
     notes: prompt.notes || null,
-    created_at: new Date(prompt.createdAt).toISOString()
+    created_at: createdAtDate.toISOString() // ISO string for timestamptz
   };
 
   const { error } = await supabase
@@ -71,6 +77,7 @@ export const savePromptToSupabase = async (prompt: PromptData): Promise<void> =>
     throw new Error(error.message + ' (' + error.details + ')');
   }
 };
+
 
 export const deletePromptFromSupabase = async (id: string): Promise<void> => {
   const { error } = await supabase

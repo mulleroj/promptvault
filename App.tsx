@@ -5,7 +5,7 @@ import { PromptDetail } from './components/PromptDetail';
 import { PromptData, PromptType } from './types';
 import { savePromptsLocal, loadPromptsLocal, fetchPromptsFromSupabase, savePromptToSupabase, deletePromptFromSupabase } from './services/storage';
 import { exportPromptsToDocx } from './services/docxGenerator';
-import { Plus, Download, Search, LayoutGrid, FileText } from 'lucide-react';
+import { Plus, Download, Search, LayoutGrid, FileText, Upload } from 'lucide-react';
 
 const App: React.FC = () => {
   const [prompts, setPrompts] = useState<PromptData[]>([]);
@@ -27,55 +27,44 @@ const App: React.FC = () => {
     // 2. Fetch from cloud and update
     fetchPromptsFromSupabase().then(cloudPrompts => {
       if (cloudPrompts.length > 0) {
-        // Here we could implement merging, but for simplicity, we'll let cloud win if it has data
-        // or merge them. For now, let's just use cloud prompts as source of truth if available.
+        // Cloud is source of truth - use cloud data and update local cache
         setPrompts(cloudPrompts);
         savePromptsLocal(cloudPrompts); // Update local cache
       }
     });
   }, []);
 
-  // Save data on change (only local cache, cloud save is explicit in handlers)
-  useEffect(() => {
-    if (prompts.length > 0) {
-      savePromptsLocal(prompts);
-    }
-  }, [prompts]);
 
   const handleSavePrompt = async (newPrompt: PromptData) => {
-    // Optimistic update
-    const updated = [newPrompt, ...prompts];
-    setPrompts(updated);
-    savePromptsLocal(updated);
     setShowAddForm(false);
 
-    // Cloud save
+    // Save to Supabase
     try {
       await savePromptToSupabase(newPrompt);
+      // On success, add to local state using functional update
+      setPrompts(prevPrompts => [newPrompt, ...prevPrompts]);
     } catch (error: any) {
-      alert("Pozor: Prompt se uložil jen lokálně, nahrávání do cloudu selhalo.\nChyba: " + error.message);
+      alert("Chyba při ukládání do databáze: " + error.message);
     }
   };
 
   const handleDeletePrompt = async (id: string) => {
     if (window.confirm('Opravdu chcete smazat tento prompt?')) {
-      // Optimistic update
-      const updated = prompts.filter(p => p.id !== id);
-      setPrompts(updated);
-      savePromptsLocal(updated);
-
-      // Cloud delete
+      // Delete from Supabase first
       try {
         await deletePromptFromSupabase(id);
-      } catch (error) {
-        console.error("Cloud delete failed", error);
-      }
+        // On success, remove from local state
+        setPrompts(prevPrompts => prevPrompts.filter(p => p.id !== id));
 
-      // Remove from selection if selected
-      if (selectedIds.has(id)) {
-        const newSelected = new Set(selectedIds);
-        newSelected.delete(id);
-        setSelectedIds(newSelected);
+        // Remove from selection if selected
+        if (selectedIds.has(id)) {
+          const newSelected = new Set(selectedIds);
+          newSelected.delete(id);
+          setSelectedIds(newSelected);
+        }
+      } catch (error) {
+        console.error("Chyba při mazání z databáze:", error);
+        alert("Nepodařilo se smazat prompt z databáze.");
       }
     }
   };
@@ -92,6 +81,50 @@ const App: React.FC = () => {
       newSelected.add(id);
     }
     setSelectedIds(newSelected);
+  };
+
+  const handleMigrateLocalData = async () => {
+    const localPrompts = loadPromptsLocal();
+    if (localPrompts.length === 0) {
+      alert('Žádná lokální data k migraci.');
+      return;
+    }
+
+    // Get current Supabase data to avoid duplicates
+    const supabasePrompts = await fetchPromptsFromSupabase();
+    const supabaseIds = new Set(supabasePrompts.map(p => p.id));
+
+    // Find prompts that are only in local storage
+    const promptsToMigrate = localPrompts.filter(p => !supabaseIds.has(p.id));
+
+    if (promptsToMigrate.length === 0) {
+      alert('Všechny lokální prompty jsou již v databázi.');
+      return;
+    }
+
+    if (!window.confirm(`Přenést ${promptsToMigrate.length} promptů z lokálního úložiště do Supabase?`)) {
+      return;
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const prompt of promptsToMigrate) {
+      try {
+        await savePromptToSupabase(prompt);
+        successCount++;
+      } catch (error) {
+        console.error('Chyba při migraci promptu:', prompt.title, error);
+        errorCount++;
+      }
+    }
+
+    alert(`Migrace dokončena!\nÚspěšně: ${successCount}\nChyby: ${errorCount}`);
+
+    // Reload data from Supabase
+    const updatedPrompts = await fetchPromptsFromSupabase();
+    setPrompts(updatedPrompts);
+    savePromptsLocal(updatedPrompts);
   };
 
   const handleExport = async () => {
@@ -186,6 +219,20 @@ const App: React.FC = () => {
                   </select>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
+              <h3 className="text-sm font-semibold mb-2">Migrace dat</h3>
+              <p className="text-xs text-slate-400 mb-3">
+                Přeneste lokálně uložené prompty do cloudu (Supabase).
+              </p>
+              <button
+                onClick={handleMigrateLocalData}
+                className="w-full py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-emerald-700 hover:bg-emerald-600 text-white"
+              >
+                <Upload size={16} />
+                Migrovat lokální data
+              </button>
             </div>
 
             <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
