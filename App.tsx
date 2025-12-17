@@ -472,6 +472,8 @@ const App: React.FC = () => {
                 prompt={prompts.find(p => p.id === viewedPromptId)!}
                 onClose={() => setViewedPromptId(null)}
                 onClone={handleClonePrompt}
+                onEdit={handleEditPrompt}
+                onDelete={handleDeletePrompt}
               />
             </div>
           </div>

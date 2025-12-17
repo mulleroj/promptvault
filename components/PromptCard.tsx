@@ -79,8 +79,8 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, isSelected, onTo
           )}
         </div>
 
-        <div className="flex justify-between items-center pt-2 border-t border-slate-100 mt-2">
-          <div className="flex gap-2">
+        <div className="pt-2 border-t border-slate-100 mt-2">
+          <div className="flex gap-2 mb-2">
             <button
               onClick={(e) => { e.stopPropagation(); onCopy(prompt.content); }}
               className="text-xs text-slate-600 hover:text-indigo-600 font-medium px-2 py-1 rounded hover:bg-indigo-50 transition-colors flex items-center gap-1"
@@ -90,27 +90,15 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, isSelected, onTo
               Kopírovat
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onEdit(prompt.id); }}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
-            >
-              Upravit
-            </button>
-            <button
               onClick={(e) => { e.stopPropagation(); onView(prompt.id); }}
               className="text-xs text-indigo-600 hover:text-indigo-700 font-medium px-2 py-1 rounded hover:bg-indigo-50 transition-colors"
             >
               Zobrazit
             </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(prompt.id); }}
-              className="text-xs text-red-400 hover:text-red-600 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
-            >
-              Smazat
-            </button>
           </div>
-          <span className="text-[10px] text-slate-400">
+          <div className="text-[10px] text-slate-500 font-semibold">
             {new Date(prompt.createdAt).toLocaleDateString('cs-CZ')}
-          </span>
+          </div>
         </div>
       </div>
     </div>
