@@ -24,13 +24,11 @@ const App: React.FC = () => {
     const local = loadPromptsLocal();
     setPrompts(local);
 
-    // 2. Fetch from cloud and update
+    // 2. Fetch from cloud and update (cloud is source of truth)
     fetchPromptsFromSupabase().then(cloudPrompts => {
-      if (cloudPrompts.length > 0) {
-        // Cloud is source of truth - use cloud data and update local cache
-        setPrompts(cloudPrompts);
-        savePromptsLocal(cloudPrompts); // Update local cache
-      }
+      // Always update with cloud data (even if empty) - cloud is source of truth
+      setPrompts(cloudPrompts);
+      savePromptsLocal(cloudPrompts); // Update local cache
     });
   }, []);
 
@@ -134,6 +132,50 @@ const App: React.FC = () => {
     await exportPromptsToDocx(toExport);
     alert('Export dokončen! Soubor by se měl začít stahovat.');
     setSelectedIds(new Set()); // Clear selection after export
+  };
+
+  const handleMigrateLocalData = async () => {
+    const localPrompts = loadPromptsLocal();
+    if (localPrompts.length === 0) {
+      alert('Žádná lokální data k migraci.');
+      return;
+    }
+
+    // Get current Supabase data to avoid duplicates
+    const supabasePrompts = await fetchPromptsFromSupabase();
+    const supabaseIds = new Set(supabasePrompts.map(p => p.id));
+
+    // Find prompts that are only in local storage
+    const promptsToMigrate = localPrompts.filter(p => !supabaseIds.has(p.id));
+
+    if (promptsToMigrate.length === 0) {
+      alert('Všechny lokální prompty jsou již v databázi.');
+      return;
+    }
+
+    if (!window.confirm(`Přenést ${promptsToMigrate.length} promptů z lokálního úložiště do Supabase?`)) {
+      return;
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const prompt of promptsToMigrate) {
+      try {
+        await savePromptToSupabase(prompt);
+        successCount++;
+      } catch (error) {
+        console.error('Chyba při migraci promptu:', prompt.title, error);
+        errorCount++;
+      }
+    }
+
+    alert(`Migrace dokončena!\nÚspěšně: ${successCount}\nChyby: ${errorCount}`);
+
+    // Reload data from Supabase
+    const updatedPrompts = await fetchPromptsFromSupabase();
+    setPrompts(updatedPrompts);
+    savePromptsLocal(updatedPrompts);
   };
 
   // Derived state for filtering
