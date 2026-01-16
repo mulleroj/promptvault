@@ -3,6 +3,8 @@ export enum PromptType {
   IMAGE = 'Generování Obrázků',
   VIDEO = 'Video',
   AUDIO = 'Audio',
+  INFOGRAFIKA = 'Infografika',
+  PREZENTACE = 'Prezentace',
   OTHER = 'Ostatní',
 }
 
