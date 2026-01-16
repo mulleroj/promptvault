@@ -5,7 +5,11 @@ import { PromptDetail } from './components/PromptDetail';
 import { PromptData, PromptType } from './types';
 import { savePromptsLocal, loadPromptsLocal, fetchPromptsFromSupabase, savePromptToSupabase, deletePromptFromSupabase, toggleFavoriteInSupabase, exportAllPrompts, importPromptsData } from './services/storage';
 import { exportPromptsToDocx } from './services/docxGenerator';
-import { Plus, Download, Search, LayoutGrid, FileText, Upload, Star, Copy } from 'lucide-react';
+import { Plus, Download, Search, LayoutGrid, FileText, Upload, Star, Copy, Lock, LogOut } from 'lucide-react';
+
+// Admin credentials
+const ADMIN_EMAIL = 'mulleroj@seznam.cz';
+const ADMIN_PASSWORD = 'Heslo123!';
 
 const App: React.FC = () => {
   const [prompts, setPrompts] = useState<PromptData[]>([]);
@@ -20,6 +24,13 @@ const App: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('All');
   const [filterModel, setFilterModel] = useState<string>('All');
+
+  // Admin authentication state
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
 
   // Load data on mount (Local + Cloud)
   useEffect(() => {
@@ -266,6 +277,24 @@ const App: React.FC = () => {
     setTimeout(() => setToastMessage(''), 3000);
   };
 
+  // Admin login handler
+  const handleAdminLogin = () => {
+    if (loginEmail === ADMIN_EMAIL && loginPassword === ADMIN_PASSWORD) {
+      setIsAdmin(true);
+      setShowLoginModal(false);
+      setLoginEmail('');
+      setLoginPassword('');
+      setLoginError('');
+      showToast('🔓 Přihlášení úspěšné');
+    } else {
+      setLoginError('Nesprávný email nebo heslo');
+    }
+  };
+
+  const handleAdminLogout = () => {
+    setIsAdmin(false);
+    showToast('🔐 Odhlášeno z admin módu');
+  };
 
   // Derived state for filtering
   const uniqueModels = useMemo(() => {
@@ -294,6 +323,73 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
 
+      {/* Admin Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-indigo-100 rounded-lg">
+                <Lock className="text-indigo-600" size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">Admin přihlášení</h2>
+                <p className="text-sm text-slate-500">Zadejte přihlašovací údaje</p>
+              </div>
+            </div>
+
+            {loginError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                {loginError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="váš@email.cz"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Heslo</label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAdminLogin()}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowLoginModal(false);
+                  setLoginError('');
+                  setLoginEmail('');
+                  setLoginPassword('');
+                }}
+                className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Zrušit
+              </button>
+              <button
+                onClick={handleAdminLogin}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+              >
+                Přihlásit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile Header / Sidebar Toggle could go here */}
 
       {/* Sidebar / Navigation */}
@@ -306,13 +402,37 @@ const App: React.FC = () => {
         </div>
 
         <div className="p-4 flex-grow overflow-y-auto">
+          {/* Admin Login/Logout Button */}
           <button
-            onClick={() => setShowAddForm(true)}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white p-3 rounded-lg flex items-center justify-center gap-2 font-medium transition-all shadow-lg hover:shadow-indigo-500/20 mb-6"
+            onClick={() => isAdmin ? handleAdminLogout() : setShowLoginModal(true)}
+            className={`w-full p-3 rounded-lg flex items-center justify-center gap-2 font-medium transition-all mb-4 ${isAdmin
+              ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+              }`}
           >
-            <Plus size={20} />
-            Přidat nový prompt
+            {isAdmin ? (
+              <>
+                <LogOut size={20} />
+                Odhlásit se
+              </>
+            ) : (
+              <>
+                <Lock size={20} />
+                Admin přihlášení
+              </>
+            )}
           </button>
+
+          {/* Add Prompt Button - Admin Only */}
+          {isAdmin && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white p-3 rounded-lg flex items-center justify-center gap-2 font-medium transition-all shadow-lg hover:shadow-indigo-500/20 mb-6"
+            >
+              <Plus size={20} />
+              Přidat nový prompt
+            </button>
+          )}
 
           <div className="space-y-6">
             <div>
@@ -372,43 +492,47 @@ const App: React.FC = () => {
                 </button>
               </div>
             </div>
+            {/* Admin-only sections */}
+            {isAdmin && (
+              <>
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
+                  <h3 className="text-sm font-semibold mb-2">Export / Import</h3>
+                  <p className="text-xs text-slate-400 mb-3">
+                    Záloha a obnova promptů ve formátu JSON
+                  </p>
+                  <div className="space-y-2">
+                    <button
+                      onClick={handleExportJSON}
+                      className="w-full py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-indigo-700 hover:bg-indigo-600 text-white"
+                    >
+                      <Download size={16} />
+                      Export JSON
+                    </button>
+                    <button
+                      onClick={handleImportJSON}
+                      className="w-full py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-slate-700 hover:bg-slate-600 text-white"
+                    >
+                      <Upload size={16} />
+                      Import JSON
+                    </button>
+                  </div>
+                </div>
 
-            <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
-              <h3 className="text-sm font-semibold mb-2">Export / Import</h3>
-              <p className="text-xs text-slate-400 mb-3">
-                Záloha a obnova promptů ve formátu JSON
-              </p>
-              <div className="space-y-2">
-                <button
-                  onClick={handleExportJSON}
-                  className="w-full py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-indigo-700 hover:bg-indigo-600 text-white"
-                >
-                  <Download size={16} />
-                  Export JSON
-                </button>
-                <button
-                  onClick={handleImportJSON}
-                  className="w-full py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-slate-700 hover:bg-slate-600 text-white"
-                >
-                  <Upload size={16} />
-                  Import JSON
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
-              <h3 className="text-sm font-semibold mb-2">Migrace dat</h3>
-              <p className="text-xs text-slate-400 mb-3">
-                Přeneste lokálně uložené prompty do cloudu (Supabase).
-              </p>
-              <button
-                onClick={handleMigrateLocalData}
-                className="w-full py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-emerald-700 hover:bg-emerald-600 text-white"
-              >
-                <Upload size={16} />
-                Migrovat lokální data
-              </button>
-            </div>
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
+                  <h3 className="text-sm font-semibold mb-2">Migrace dat</h3>
+                  <p className="text-xs text-slate-400 mb-3">
+                    Přeneste lokálně uložené prompty do cloudu (Supabase).
+                  </p>
+                  <button
+                    onClick={handleMigrateLocalData}
+                    className="w-full py-2 px-4 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-emerald-700 hover:bg-emerald-600 text-white"
+                  >
+                    <Upload size={16} />
+                    Migrovat lokální data
+                  </button>
+                </div>
+              </>
+            )}
 
             <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
               <div className="flex justify-between items-center mb-2">
@@ -474,6 +598,7 @@ const App: React.FC = () => {
                 onClone={handleClonePrompt}
                 onEdit={handleEditPrompt}
                 onDelete={handleDeletePrompt}
+                isAdmin={isAdmin}
               />
             </div>
           </div>

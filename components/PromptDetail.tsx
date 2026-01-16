@@ -8,9 +8,10 @@ interface PromptDetailProps {
     onClone: (prompt: PromptData) => void;
     onEdit: (id: string) => void;
     onDelete: (id: string) => void;
+    isAdmin: boolean;
 }
 
-export const PromptDetail: React.FC<PromptDetailProps> = ({ prompt, onClose, onClone, onEdit, onDelete }) => {
+export const PromptDetail: React.FC<PromptDetailProps> = ({ prompt, onClose, onClone, onEdit, onDelete, isAdmin }) => {
     const [copied, setCopied] = useState(false);
 
     const handleCopyPrompt = () => {
@@ -126,27 +127,31 @@ export const PromptDetail: React.FC<PromptDetailProps> = ({ prompt, onClose, onC
             {/* Footer */}
             <div className="p-4 border-t border-slate-200 flex justify-between items-center flex-shrink-0">
                 <div className="flex gap-2">
-                    <button
-                        onClick={() => { onEdit(prompt.id); onClose(); }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
-                    >
-                        <Edit size={16} />
-                        Upravit
-                    </button>
-                    <button
-                        onClick={() => { onDelete(prompt.id); onClose(); }}
-                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
-                    >
-                        <Trash2 size={16} />
-                        Smazat
-                    </button>
-                    <button
-                        onClick={() => { onClone(prompt); onClose(); }}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
-                    >
-                        <FileStack size={16} />
-                        Klonovat
-                    </button>
+                    {isAdmin && (
+                        <>
+                            <button
+                                onClick={() => { onEdit(prompt.id); onClose(); }}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+                            >
+                                <Edit size={16} />
+                                Upravit
+                            </button>
+                            <button
+                                onClick={() => { onDelete(prompt.id); onClose(); }}
+                                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
+                            >
+                                <Trash2 size={16} />
+                                Smazat
+                            </button>
+                            <button
+                                onClick={() => { onClone(prompt); onClose(); }}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                            >
+                                <FileStack size={16} />
+                                Klonovat
+                            </button>
+                        </>
+                    )}
                 </div>
                 <button
                     onClick={onClose}
