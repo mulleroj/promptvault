@@ -2,14 +2,41 @@ import { PromptData } from '../types';
 import { supabase } from './supabaseClient';
 
 const STORAGE_KEY = 'promptvault_db';
+const MAX_LOCAL_STORAGE_MB = 4; // Conservative limit (browser typically allows 5-10MB)
 
 // --- Local Storage Helpers ---
 
 export const savePromptsLocal = (prompts: PromptData[]): void => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prompts));
-  } catch (error) {
-    console.warn("Failed to save to local storage (quota might be full)", error);
+    const dataString = JSON.stringify(prompts);
+    const sizeInMB = new Blob([dataString]).size / (1024 * 1024);
+
+    // If data is too large, warn and skip
+    if (sizeInMB > MAX_LOCAL_STORAGE_MB) {
+      console.warn(
+        `⚠️ Data příliš velká pro localStorage (${sizeInMB.toFixed(2)}MB). ` +
+        `Používejte cloud storage (Supabase) pro velké knihovny.`
+      );
+      return;
+    }
+
+    localStorage.setItem(STORAGE_KEY, dataString);
+  } catch (error: any) {
+    if (error.name === 'QuotaExceededError') {
+      console.warn(
+        "⚠️ LocalStorage je plný. Cloud (Supabase) je hlavní úložiště. " +
+        "Lokální kopie slouží jen pro rychlé načtení."
+      );
+      // Clear old data to prevent repeated errors
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        console.info("✓ Vyčistil jsem starý cache");
+      } catch (e) {
+        // If even removal fails, ignore
+      }
+    } else {
+      console.warn("Failed to save to local storage", error);
+    }
   }
 };
 

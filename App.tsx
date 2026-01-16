@@ -278,7 +278,7 @@ const App: React.FC = () => {
       .filter(p => {
         const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase()) ||
           p.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
-        const matchesType = filterType === 'All' || p.type === filterType;
+        const matchesType = filterType === 'All' || p.type?.toLowerCase() === filterType.toLowerCase();
         const matchesModel = filterModel === 'All' || p.model === filterModel;
         const matchesFavorites = !showFavoritesOnly || p.isFavorite;
         return matchesSearch && matchesType && matchesModel && matchesFavorites;
